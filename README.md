@@ -8,7 +8,10 @@ com `pandas.DataFrame`.
 ## Execução no Google Colab
 
 1. No GitHub, use **Code → Download ZIP** para baixar este repositório e baixe
-   também `notebooks/analise-consolidada-dataframe.ipynb`.
+   também o notebook de interesse: o
+   `notebooks/analise-consolidada-dataframe-estudante.ipynb` é a versão guiada
+   para gerar código com Gemini, enquanto
+   `notebooks/analise-consolidada-dataframe.ipynb` é a referência completa.
 2. Abra o notebook no Colab e, no painel **Arquivos**, envie o `.ipynb` e o ZIP
    para o mesmo ambiente. O ZIP é o arquivo de dados da análise.
 3. Na seção `0. Preparação no Google Colab`, peça ao agente para localizar e
@@ -21,7 +24,8 @@ com `pandas.DataFrame`.
 Esta variante não requer instalação: o Colab já fornece Python, NumPy, Pandas,
 Matplotlib e IPython. A análise mostra leitura tabular, seleção, cutflow,
 massas invariantes, normalização e uma estimativa simplificada de seção de
-choque.
+choque. Na versão estudante, use o Gemini para gerar o código de cada célula,
+cole-o e revise os resultados antes de prosseguir.
 
 ## Física e limitações
 
