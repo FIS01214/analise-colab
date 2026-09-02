@@ -5,18 +5,29 @@ para o canal `pp → H → γγ`, comparado ao fundo contínuo `pp → γγ` sem
 Ele foi preparado a partir do template FIS01214 e contém um notebook integrado
 com `pandas.DataFrame`.
 
-## Execução
+## Execução no Google Colab
 
-Abra `notebooks/analise-consolidada-dataframe.ipynb` no Google Colab. Faça
-upload do notebook e do ZIP deste repositório no painel **Arquivos**, descompacte
-o ZIP e confirme `data/sinal.lhe.gz` e `data/fundo.lhe.gz`. O Colab já fornece
-Python, NumPy, Pandas e Matplotlib; não é necessário instalar pacotes nesta
-variante. Execute as células na ordem para ver a leitura, seleção, cutflow,
-massas invariantes, normalização e estimativa simplificada de seção de choque.
+1. No GitHub, use **Code → Download ZIP** para baixar este repositório e baixe
+   também `notebooks/analise-consolidada-dataframe.ipynb`.
+2. Abra o notebook no Colab e, no painel **Arquivos**, envie o `.ipynb` e o ZIP
+   para o mesmo ambiente. O ZIP é o arquivo de dados da análise.
+3. Na seção `0. Preparação no Google Colab`, peça ao agente para localizar e
+   descompactar o ZIP, entrar na pasta extraída e inflar
+   `data/sinal.lhe.gz` e `data/fundo.lhe.gz` com `gzip`, preservando os arquivos
+   `.gz`. Confirme a presença das versões comprimida e descomprimida.
+4. Execute as células restantes na ordem. Os caminhos esperados são relativos
+   à pasta `notebooks/` e apontam para `../data/`.
+
+Esta variante não requer instalação: o Colab já fornece Python, NumPy, Pandas,
+Matplotlib e IPython. A análise mostra leitura tabular, seleção, cutflow,
+massas invariantes, normalização e uma estimativa simplificada de seção de
+choque.
 
 ## Física e limitações
 
-Os eventos são simulados no nível de gerador. O pico de massa invariante dos
-fótons ilustra a assinatura do Higgs, mas não representa uma medida experimental
-com detector real: não há reconstrução, resolução, trigger, pileup ou
-calibração. Os resultados servem como demonstração didática reproduzível.
+Os arquivos `sinal.lhe.gz` e `fundo.lhe.gz` correspondem, respectivamente, a
+`pp → H → γγ` e ao contínuo `pp → γγ` sem Higgs. O pico de massa invariante dos
+fótons ilustra a assinatura do Higgs. Os eventos estão no nível de gerador:
+não há reconstrução, resolução de detector, trigger, pileup ou calibração.
+Portanto, a seção de choque estimada é didática e deve ser interpretada junto
+com a aceitação, eficiência e luminosidade adotadas.
