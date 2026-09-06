@@ -37,3 +37,5 @@ fótons ilustra a assinatura do Higgs. Os eventos estão no nível de gerador:
 não há reconstrução, resolução de detector, trigger, pileup ou calibração.
 Portanto, a seção de choque estimada é didática e deve ser interpretada junto
 com a aceitação, eficiência e luminosidade adotadas.
+
+Os notebooks ativam `%jsroot on` e exibem os canvases ROOT interativos diretamente no ambiente; os PNGs são mantidos apenas como arquivos de saída.
