@@ -107,7 +107,7 @@ class RootAxis:
             banda.SetPoint(indice, float(x_valor), float(y_valor))
             banda.SetPointError(indice, 0.0, 0.0, float(erro), float(erro))
         banda.SetFillColor(cor)
-        banda.SetFillStyle(3345)
+        banda.SetFillStyle(3002)
         banda.SetLineColor(cor)
         banda.SetLineWidth(max(1, int(linewidth)))
         banda.SetTitle("")
