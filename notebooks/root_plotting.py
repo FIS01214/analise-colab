@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from array import array
 from pathlib import Path
+import re
+import unicodedata
 
 import numpy as np
 import ROOT
@@ -27,6 +29,25 @@ _CORES = {
 
 def _cor(valor):
     return _CORES.get(valor, ROOT.kBlack)
+
+
+def _normalizar_rotulo_root(valor):
+    """Converte simbolos fisicos Unicode ou ASCII para TLatex do ROOT."""
+    texto = str(valor)
+    for origem, destino in {
+        "Δ": "#Delta", "γ": "#gamma", "η": "#eta", "φ": "#phi",
+        "μ": "#mu", "θ": "#theta", "λ": "#lambda",
+    }.items():
+        texto = texto.replace(origem, destino)
+    texto = re.sub(r"(?<![#A-Za-z])DeltaR(?![A-Za-z])", "#Delta R", texto, flags=re.IGNORECASE)
+    texto = re.sub(r"(?<![#A-Za-z])Delta(?![A-Za-z])", "#Delta", texto, flags=re.IGNORECASE)
+    for nome, simbolo in (("gamma", "#gamma"), ("eta", "#eta"), ("phi", "#phi")):
+        texto = re.sub(rf"(?<![#A-Za-z]){nome}(?![A-Za-z])", simbolo, texto, flags=re.IGNORECASE)
+    texto = re.sub(r"(?<![#A-Za-z])pT(?![A-Za-z])", "#it{p}_{T}", texto)
+    return "".join(
+        caractere for caractere in unicodedata.normalize("NFKD", texto)
+        if not unicodedata.combining(caractere)
+    )
 
 
 class RootAxis:
@@ -57,7 +78,7 @@ class RootAxis:
         if histtype == "step":
             hist.SetFillStyle(0)
         if label:
-            hist.SetTitle(label)
+            hist.SetTitle(_normalizar_rotulo_root(label))
         self._desenhar(hist, "HIST SAME" if self.objetos else "HIST")
         return contagens, bordas, hist
 
@@ -71,7 +92,7 @@ class RootAxis:
         hist.SetLineWidth(max(1, int(linewidth)))
         hist.SetFillColorAlpha(_cor(color), float(alpha)) if fill else hist.SetFillStyle(0)
         if label:
-            hist.SetTitle(label)
+            hist.SetTitle(_normalizar_rotulo_root(label))
         self._desenhar(hist, "HIST SAME" if self.objetos else "HIST")
         return hist
 
@@ -96,7 +117,7 @@ class RootAxis:
             linha.SetLineColor(cor)
             linha.SetLineWidth(max(1, int(linewidth)))
             if label:
-                linha.SetTitle(str(label))
+                linha.SetTitle(_normalizar_rotulo_root(label))
             self._desenhar(linha, "L SAME")
         return banda
 
@@ -124,7 +145,7 @@ class RootAxis:
 
     def set_xlabel(self, texto):
         self.pad.SetBottomMargin(0.15)
-        self._xlabel = str(texto)
+        self._xlabel = _normalizar_rotulo_root(texto)
         if self.objetos and hasattr(self.objetos[0], "GetXaxis"):
             eixo_x = self.objetos[0].GetXaxis()
             eixo_x.SetTitle(self._xlabel)
@@ -133,7 +154,7 @@ class RootAxis:
 
     def set_ylabel(self, texto):
         self.pad.SetLeftMargin(0.18)
-        self._ylabel = str(texto)
+        self._ylabel = _normalizar_rotulo_root(texto)
         if self.objetos and hasattr(self.objetos[0], "GetYaxis"):
             eixo_y = self.objetos[0].GetYaxis()
             eixo_y.SetTitle(self._ylabel)
@@ -141,7 +162,7 @@ class RootAxis:
             eixo_y.SetLabelSize(0.04)
 
     def set_title(self, texto):
-        self.pad.SetTitle(str(texto))
+        self.pad.SetTitle(_normalizar_rotulo_root(texto))
 
     def set_ylim(self, ymin, ymax):
         """Aplicar explicitamente o intervalo Y ao primeiro objeto desenhado."""
@@ -182,7 +203,7 @@ class RootAxis:
 
 class RootFigure:
     def __init__(self, nrows, ncols):
-        self.canvas = ROOT.TCanvas("c", "FIS01214", 1200, 800)
+        self.canvas = ROOT.TCanvas("c", "FIS01214", 2400, 1600)
         self.canvas.Divide(ncols, nrows)
         self.axes = [RootAxis(self.canvas.cd(i + 1), i) for i in range(nrows * ncols)]
 
@@ -197,7 +218,7 @@ class RootFigure:
             if ax is not None:
                 ax.pad.SetRightMargin(0.20)
             eixo_z = objeto.GetZaxis()
-            eixo_z.SetTitle(str(label or ""))
+            eixo_z.SetTitle(_normalizar_rotulo_root(label or ""))
             eixo_z.SetTitleSize(0.05)
             eixo_z.SetLabelSize(0.04)
 
