@@ -9,8 +9,8 @@ com `pandas.DataFrame`.
 
 ## Execução no Google Colab
 
-1. No GitHub, use **Code → Download ZIP** para baixar este repositório e baixe
-   também o notebook de interesse: o
+1. No GitHub, use **Code → Download ZIP** para baixar este repositório. Renomeie
+   o arquivo baixado para `analise-colab-main.zip` e baixe também o notebook de interesse: o
    `notebooks/analise-consolidada-dataframe-estudante.ipynb` é a versão guiada
    para gerar código com Gemini, enquanto
    `notebooks/analise-consolidada-dataframe.ipynb` é a referência completa.
