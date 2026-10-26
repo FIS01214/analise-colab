@@ -1,289 +1,102 @@
-"""Adaptador mínimo para desenhar os gráficos didáticos com PyROOT.
+"""Backend de gráficos Matplotlib para execução no Google Colab.
 
-As funções expostas imitam somente a pequena parte da API de Matplotlib usada
-pelos notebooks. Os objetos reais criados são TCanvas, TH1D, TH2D e TGraph.
+O notebook usa somente a pequena API exposta por ``matplotlib.pyplot``.
+Manter este módulo com o nome ``root_plotting`` evita alterar todas as células
+do notebook, mas a versão Colab não depende de PyROOT, ROOT ou JSROOT.
 """
 
 from __future__ import annotations
 
-from array import array
-from pathlib import Path
 import re
 import unicodedata
-from itertools import count
 
+import matplotlib.pyplot as _plt
 import numpy as np
-import ROOT
-from IPython.display import display
-
-# O SWAN e o Colab exibem o TCanvas por JSROOT diretamente no notebook.
-ROOT.gROOT.SetBatch(False)
-ROOT.gStyle.SetOptStat(0)
-
-_CORES = {
-    "tab:blue": ROOT.kBlue + 1,
-    "tab:orange": ROOT.kOrange + 7,
-    "black": ROOT.kBlack,
-    "tab:green": ROOT.kGreen + 2,
-}
-_OBJETOS = count()
 
 
-def _nome_objeto(prefixo):
-    """Gera nomes ROOT unicos sem poluir as legendas."""
-    return f"{prefixo}_{next(_OBJETOS)}"
-
-
-def _cor(valor):
-    return _CORES.get(valor, ROOT.kBlack)
-
-
-def _normalizar_rotulo_root(valor):
-    """Converte simbolos fisicos Unicode ou ASCII para TLatex do ROOT."""
+def _normalizar_rotulo(valor):
+    """Converte rótulos ROOT/TLatex usados no roteiro para texto Matplotlib."""
     texto = str(valor)
-    for origem, destino in {
-        "Δ": "#Delta", "γ": "#gamma", "η": "#eta", "φ": "#phi",
-        "μ": "#mu", "θ": "#theta", "λ": "#lambda",
-    }.items():
+    especiais = {
+        "m_{#gamma#gamma}": r"$m_{\gamma\gamma}$",
+        "m_{visivel}": r"$m_{\mathrm{visivel}}$",
+        "#it{p}_{T,#gamma#gamma}": r"$p_{T,\gamma\gamma}$",
+        "#it{p}_{T} #gamma_{lider} [GeV]": r"$p_T\,\gamma_{\mathrm{lider}}$ [GeV]",
+        "#it{p}_{T} #gamma_{sublider} [GeV]": r"$p_T\,\gamma_{\mathrm{sublider}}$ [GeV]",
+        "Maior |#eta| #gamma": r"Maior $|\eta_\gamma|$",
+        "#Delta #eta #gamma#gamma": r"$\Delta\eta_{\gamma\gamma}$",
+        "#Delta #phi #gamma#gamma": r"$\Delta\phi_{\gamma\gamma}$",
+        "#Delta R #gamma#gamma": r"$\Delta R_{\gamma\gamma}$",
+    }
+    for origem, destino in especiais.items():
         texto = texto.replace(origem, destino)
-    texto = re.sub(r"(?<![#A-Za-z])DeltaR(?![A-Za-z])", "#Delta R", texto, flags=re.IGNORECASE)
-    texto = re.sub(r"(?<![#A-Za-z])Delta(?![A-Za-z])", "#Delta", texto, flags=re.IGNORECASE)
-    for nome, simbolo in (("gamma", "#gamma"), ("eta", "#eta"), ("phi", "#phi")):
+    substituicoes = {
+        "#it{p}_{T}": r"$p_T$",
+        "#Delta": r"$\Delta$",
+        "#gamma": r"$\gamma$",
+        "#eta": r"$\eta$",
+        "#phi": r"$\phi$",
+        "#mu": r"$\mu$",
+        "#theta": r"$\theta$",
+        "#lambda": r"$\lambda$",
+    }
+    for origem, destino in substituicoes.items():
+        texto = texto.replace(origem, destino)
+    texto = re.sub(r"(?<![#A-Za-z])DeltaR(?![A-Za-z])", r"$\Delta R$", texto, flags=re.IGNORECASE)
+    texto = re.sub(r"(?<![#A-Za-z])Delta(?![A-Za-z])", r"$\Delta$", texto, flags=re.IGNORECASE)
+    for nome, simbolo in (("gamma", r"$\gamma$"), ("eta", r"$\eta$"), ("phi", r"$\phi$")):
         texto = re.sub(rf"(?<![#A-Za-z]){nome}(?![A-Za-z])", simbolo, texto, flags=re.IGNORECASE)
-    texto = re.sub(r"(?<![#A-Za-z])pT(?![A-Za-z])", "#it{p}_{T}", texto)
-    return "".join(
-        caractere for caractere in unicodedata.normalize("NFKD", texto)
-        if not unicodedata.combining(caractere)
-    )
+    texto = unicodedata.normalize("NFKD", texto)
+    return "".join(caractere for caractere in texto if not unicodedata.combining(caractere))
 
 
-class RootAxis:
-    def __init__(self, pad, indice):
-        self.pad = pad
-        self.indice = indice
-        self.objetos = []
-        self.legend_obj = None
+class _Eixo:
+    """Adaptador mínimo para normalizar rótulos sem alterar a API do notebook."""
 
-    def _desenhar(self, objeto, opcao=""):
-        self.pad.cd()
-        objeto.Draw(opcao)
-        self.objetos.append(objeto)
-        return objeto
+    def __init__(self, eixo):
+        self._eixo = eixo
 
-    def hist(self, valores, bins=40, range=None, weights=None, histtype="step",
-             color="black", label=None, linewidth=1.5, **_):
-        valores = np.asarray(valores, dtype=float)
-        pesos = None if weights is None else np.asarray(weights, dtype=float)
-        contagens, bordas = np.histogram(valores, bins=bins, range=range, weights=pesos)
-        hist = ROOT.TH1D(_nome_objeto("h"), "", len(bordas) - 1,
-                         array("d", bordas))
-        for i, valor in enumerate(contagens, start=1):
-            hist.SetBinContent(i, float(valor))
-        hist.SetLineColor(_cor(color))
-        hist.SetLineWidth(max(1, int(linewidth)))
-        hist.SetFillColor(_cor(color) if histtype != "step" else 0)
-        if histtype == "step":
-            hist.SetFillStyle(0)
-        if label:
-            hist.SetTitle(_normalizar_rotulo_root(label))
-        self._desenhar(hist, "HIST SAME" if self.objetos else "HIST")
-        return contagens, bordas, hist
+    def __getattr__(self, nome):
+        atributo = getattr(self._eixo, nome)
+        if nome in {"set_xlabel", "set_ylabel", "set_title"}:
+            return lambda texto, *args, **kwargs: atributo(_normalizar_rotulo(texto), *args, **kwargs)
+        return atributo
 
-    def stairs(self, valores, bordas, color="black", label=None, linewidth=1.5,
-               fill=False, alpha=1.0, **_):
-        hist = ROOT.TH1D(_nome_objeto("h"), "",
-                         len(bordas) - 1, array("d", np.asarray(bordas, dtype=float)))
-        for i, valor in enumerate(np.asarray(valores, dtype=float), start=1):
-            hist.SetBinContent(i, float(valor))
-        hist.SetLineColor(_cor(color))
-        hist.SetLineWidth(max(1, int(linewidth)))
-        hist.SetFillColorAlpha(_cor(color), float(alpha)) if fill else hist.SetFillStyle(0)
-        if label:
-            hist.SetTitle(_normalizar_rotulo_root(label))
-        self._desenhar(hist, "HIST SAME" if self.objetos else "HIST")
-        return hist
 
-    def errorbar(self, x, y, yerr=None, color="black", ecolor=None, label=None,
-                 fmt="none", alpha=0.35, linewidth=1.0, **_):
-        x = np.asarray(x, dtype=float)
-        y = np.asarray(y, dtype=float)
-        ey = np.zeros_like(y) if yerr is None else np.asarray(yerr, dtype=float)
-        cor = _cor(ecolor or color)
-        tem_linha = bool(fmt and fmt != "none" and "-" in str(fmt))
-        tem_pontos = "o" in str(fmt).lower()
-        tem_banda = fmt == "none" or tem_linha
-        if tem_banda:
-            meios = 0.5 * (x[:-1] + x[1:]) if len(x) > 1 else np.array([])
-            bordas = (np.concatenate(([x[0] - (meios[0] - x[0])], meios,
-                                      [x[-1] + (x[-1] - meios[-1])]))
-                      if len(x) > 1 else np.array([x[0] - 0.5, x[0] + 0.5]))
-            banda = ROOT.TH1D(_nome_objeto("erro"), "",
-                              len(x), array("d", bordas))
-            for indice, (valor, erro) in enumerate(zip(y, ey), start=1):
-                banda.SetBinContent(indice, float(valor))
-                banda.SetBinError(indice, float(erro))
-            banda.SetFillColor(cor)
-            banda.SetFillStyle(3144)  # hachura por bin para a incerteza
-            banda.SetLineColor(cor)
-            banda.SetLineWidth(max(1, int(linewidth)))
-            banda.SetTitle("")
-            opcao_banda = "E2" if not self.objetos else "E2 SAME"
+class _Figura:
+    def __init__(self, figura):
+        self._figura = figura
+
+    def __getattr__(self, nome):
+        atributo = getattr(self._figura, nome)
+        if nome == "suptitle":
+            return lambda texto, *args, **kwargs: atributo(_normalizar_rotulo(texto), *args, **kwargs)
+        return atributo
+
+    def colorbar(self, mappable, ax=None, **kwargs):
+        """Encaminha o colorbar, removendo o wrapper do eixo quando necessário."""
+        eixo = ax._eixo if isinstance(ax, _Eixo) else ax
+        if "label" in kwargs:
+            kwargs["label"] = _normalizar_rotulo(kwargs["label"])
+        return self._figura.colorbar(mappable, ax=eixo, **kwargs)
+
+
+class _PyplotAdapter:
+    """Subconjunto de pyplot usado pelos notebooks FIS01214."""
+
+    def subplots(self, *args, **kwargs):
+        figura, eixos = _plt.subplots(*args, **kwargs)
+        if isinstance(eixos, np.ndarray):
+            eixos_adaptados = np.asarray([_Eixo(eixo) for eixo in eixos.flat], dtype=object).reshape(eixos.shape)
         else:
-            banda = ROOT.TGraphAsymmErrors(len(x))
-            for indice, (x_valor, y_valor, erro) in enumerate(zip(x, y, ey)):
-                banda.SetPoint(indice, float(x_valor), float(y_valor))
-                banda.SetPointError(indice, 0.0, 0.0, float(erro), float(erro))
-            banda.SetFillStyle(0)
-            banda.SetLineColor(cor)
-            banda.SetLineWidth(max(1, int(linewidth)))
-            if tem_pontos:
-                banda.SetMarkerStyle(20)
-                banda.SetMarkerSize(0.9)
-                banda.SetMarkerColor(cor)
-            banda.SetTitle(_normalizar_rotulo_root(label) if label else "")
-            opcao_banda = "AP" if not self.objetos else "P SAME"
-        self._desenhar(banda, opcao_banda)
-        if tem_linha:
-            linha = ROOT.TGraph(len(x), array("d", x), array("d", y))
-            linha.SetLineColor(cor)
-            linha.SetLineWidth(max(1, int(linewidth)))
-            if label:
-                linha.SetTitle(_normalizar_rotulo_root(label))
-            self._desenhar(linha, "L SAME")
-        return banda
-
-    def hist2d(self, x, y, bins=40, range=None, cmap=None, **_):
-        (xmin, xmax), (ymin, ymax) = range
-        nx, ny = (bins, bins) if isinstance(bins, int) else bins
-        hist = ROOT.TH2D(_nome_objeto("h2"), "", nx, xmin, xmax, ny, ymin, ymax)
-        # Reserve space for the Z-axis title and color scale on 2D plots.
-        self.pad.SetRightMargin(0.20)
-        for xv, yv in zip(np.asarray(x, dtype=float), np.asarray(y, dtype=float)):
-            hist.Fill(float(xv), float(yv))
-        self._desenhar(hist, "COLZ")
-        return None, None, None, hist
-
-    def plot(self, x, y, color="black", label=None, linewidth=1.5, **_):
-        x = np.asarray(x, dtype=float)
-        y = np.asarray(y, dtype=float)
-        graph = ROOT.TGraph(len(x), array("d", x), array("d", y))
-        graph.SetLineColor(_cor(color))
-        graph.SetLineWidth(max(1, int(linewidth)))
-        if label:
-            graph.SetTitle(label)
-        self._desenhar(graph, "AL" if not self.objetos else "L SAME")
-        return graph
-
-    def set_xlabel(self, texto):
-        self.pad.SetBottomMargin(0.15)
-        self._xlabel = _normalizar_rotulo_root(texto)
-        if self.objetos and hasattr(self.objetos[0], "GetXaxis"):
-            eixo_x = self.objetos[0].GetXaxis()
-            eixo_x.SetTitle(self._xlabel)
-            eixo_x.SetTitleSize(0.05)
-            eixo_x.SetLabelSize(0.04)
-
-    def set_ylabel(self, texto):
-        self.pad.SetLeftMargin(0.18)
-        self._ylabel = _normalizar_rotulo_root(texto)
-        if self.objetos and hasattr(self.objetos[0], "GetYaxis"):
-            eixo_y = self.objetos[0].GetYaxis()
-            eixo_y.SetTitle(self._ylabel)
-            eixo_y.SetTitleSize(0.05)
-            eixo_y.SetLabelSize(0.04)
-
-    def set_title(self, texto):
-        self.pad.SetTitle(_normalizar_rotulo_root(texto))
-
-    def set_ylim(self, ymin, ymax):
-        """Aplicar explicitamente o intervalo Y ao primeiro objeto desenhado."""
-        self._ylim = (float(ymin), float(ymax))
-        for objeto in self.objetos:
-            if hasattr(objeto, "GetYaxis"):
-                eixo_y = objeto.GetYaxis()
-                if eixo_y:
-                    eixo_y.SetRangeUser(*self._ylim)
-
-    def legend(self, *_, **kwargs):
-        """Draw a wide, legible legend in the upper plotting area."""
-        fontsize = kwargs.get("fontsize", 0)
-        if not hasattr(self, "_ylim"):
-            maximo = max((obj.GetMaximum() for obj in self.objetos if hasattr(obj, "GetMaximum")), default=0.0)
-            if maximo > 0:
-                self.set_ylim(0.0, 1.35 * float(maximo))
-        # Align the legend horizontally with the pad's internal data frame.
-        x_min = float(self.pad.GetLeftMargin())
-        x_max = 1.0 - float(self.pad.GetRightMargin())
-        n_entries = sum(bool(getattr(obj, "GetTitle", lambda: "")()) for obj in self.objetos)
-        y_min = 0.90 if n_entries <= 1 else 0.78
-        objetos_com_rotulo = [obj for obj in self.objetos if getattr(obj, "GetTitle", lambda: "")()]
-        legend = ROOT.TLegend(x_min, y_min, x_max, 0.98)
-        legend.SetBorderSize(0)
-        legend.SetFillStyle(0)
-        for objeto in objetos_com_rotulo:
-            nome = str(objeto.GetName())
-            if nome.startswith(("e1_", "e2_", "erro_")):
-                continue
-            legend.AddEntry(objeto, objeto.GetTitle(), "l")
-        legend.Draw()
-        # Preserve legend labels while suppressing ROOT's automatic plot title.
-        for objeto in objetos_com_rotulo:
-            objeto.SetTitle("")
-        if legend:
-            tamanho = max(0.025, min(0.06, float(fontsize) / 240.0)) if fontsize else 0.04
-            legend.SetTextSize(tamanho)
-        self.legend_obj = legend
-
-
-class RootFigure:
-    def __init__(self, nrows, ncols):
-        self.canvas = ROOT.TCanvas("c", "FIS01214", 2400, 1600)
-        self.canvas.Divide(ncols, nrows)
-        self.axes = [RootAxis(self.canvas.cd(i + 1), i) for i in range(nrows * ncols)]
-
-    def suptitle(self, texto, **_):
-        self.canvas.SetTitle(str(texto))
-
-    def tight_layout(self, **_):
-        return None
-
-    def colorbar(self, objeto, ax=None, label=None, **_):
-        if objeto:
-            if ax is not None:
-                ax.pad.SetRightMargin(0.20)
-            eixo_z = objeto.GetZaxis()
-            eixo_z.SetTitle(_normalizar_rotulo_root(label or ""))
-            eixo_z.SetTitleSize(0.05)
-            eixo_z.SetLabelSize(0.04)
-
-    def savefig(self, destino, **_):
-        destino = Path(destino)
-        destino.parent.mkdir(parents=True, exist_ok=True)
-        self.canvas.SaveAs(str(destino))
-
-
-class RootPlot:
-    def __init__(self):
-        self._last_figure = None
-
-    def subplots(self, nrows=1, ncols=1, squeeze=True, **_):
-        figura = RootFigure(nrows, ncols)
-        self._last_figure = figura
-        eixos = np.asarray(figura.axes, dtype=object).reshape(nrows, ncols)
-        if squeeze and nrows == 1 and ncols == 1:
-            eixos = eixos[0, 0]
-        elif squeeze and nrows == 1:
-            eixos = eixos[0]
-        elif squeeze and ncols == 1:
-            eixos = eixos[:, 0]
-        return figura, eixos
+            eixos_adaptados = _Eixo(eixos)
+        return _Figura(figura), eixos_adaptados
 
     def show(self):
-        if self._last_figure is not None:
-            self._last_figure.canvas.Draw()
-            display(self._last_figure.canvas)
-            return self._last_figure.canvas
-        return None
+        return _plt.show()
+
+    def __getattr__(self, nome):
+        return getattr(_plt, nome)
 
 
-plt = RootPlot()
+plt = _PyplotAdapter()
