@@ -23,8 +23,9 @@ com `pandas.DataFrame`.
 4. Execute as células restantes na ordem. Os caminhos esperados são relativos
    à pasta `notebooks/` e apontam para `../data/`.
 
-Esta variante não requer instalação: o Colab já fornece Python, NumPy, Pandas,
-Matplotlib e IPython. A análise mostra leitura tabular, seleção, cutflow,
+Esta variante não requer ROOT: o Colab já fornece Python, NumPy, Pandas,
+Matplotlib e IPython, e o repositório inclui um backend Matplotlib compatível
+com as chamadas usadas no notebook. A análise mostra leitura tabular, seleção, cutflow,
 massas invariantes, normalização e uma estimativa simplificada de seção de
 choque. Na versão estudante, use o Gemini para gerar o código de cada célula,
 cole-o e revise os resultados antes de prosseguir.
@@ -38,4 +39,6 @@ não há reconstrução, resolução de detector, trigger, pileup ou calibraçã
 Portanto, a seção de choque estimada é didática e deve ser interpretada junto
 com a aceitação, eficiência e luminosidade adotadas.
 
-Os notebooks ativam `%jsroot on` e exibem os canvases ROOT interativos diretamente no ambiente; os PNGs são mantidos apenas como arquivos de saída.
+Os notebooks usam Matplotlib e exibem as figuras diretamente nas células; os
+PNGs também são salvos em `resultados/graficos`. Nenhuma instalação de ROOT,
+PyROOT ou JSROOT é necessária no Colab.
